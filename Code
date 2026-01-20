@@ -1,0 +1,116 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import fsolve
+
+# -----------------------------
+# System Parameters
+# -----------------------------
+
+# Wastewater properties
+C0 = 100.0        # Initial contaminant concentration (mg/L)
+V_water = 1000.0  # Volume of wastewater (L)
+
+# Adsorbent properties
+m_adsorbent = np.linspace(1, 100, 100)  # Mass of adsorbent (kg)
+
+# Langmuir isotherm constants
+q_max = 50.0   # Maximum adsorption capacity (mg/g)
+K_L = 0.15     # Langmuir constant (L/mg)
+
+# Freundlich isotherm constants
+K_F = 12.0     # Freundlich constant
+n = 2.5        # Freundlich exponent
+
+# Economic parameters
+adsorbent_cost = 3.0   # $ per kg of adsorbent
+treatment_value = 0.05  # $ saved per mg of contaminant removed
+
+# -----------------------------
+# Isotherm Models
+# -----------------------------
+
+def langmuir(C):
+    return (q_max * K_L * C) / (1 + K_L * C)
+
+def freundlich(C):
+    return K_F * (C ** (1 / n))
+
+# -----------------------------
+# Batch Adsorption Model
+# -----------------------------
+
+def mass_balance(Ce, m, isotherm):
+    if isotherm == "langmuir":
+        qe = langmuir(Ce)
+    else:
+        qe = freundlich(Ce)
+    
+    adsorption = qe * m * 1e6 / V_water
+    return C0 - Ce - adsorption
+
+# -----------------------------
+# Simulation
+# -----------------------------
+
+Ce_langmuir = []
+Ce_freundlich = []
+
+for m in m_adsorbent:
+    Ce_L = fsolve(mass_balance, C0 / 2, args=(m, "langmuir"))[0]
+    Ce_F = fsolve(mass_balance, C0 / 2, args=(m, "freundlich"))[0]
+    
+    Ce_langmuir.append(Ce_L)
+    Ce_freundlich.append(Ce_F)
+
+Ce_langmuir = np.array(Ce_langmuir)
+Ce_freundlich = np.array(Ce_freundlich)
+
+removal_L = (C0 - Ce_langmuir) / C0 * 100
+removal_F = (C0 - Ce_freundlich) / C0 * 100
+
+# -----------------------------
+# Economic Analysis
+# -----------------------------
+
+removed_mass_L = (C0 - Ce_langmuir) * V_water
+removed_mass_F = (C0 - Ce_freundlich) * V_water
+
+profit_L = removed_mass_L * treatment_value - m_adsorbent * adsorbent_cost
+profit_F = removed_mass_F * treatment_value - m_adsorbent * adsorbent_cost
+
+# -----------------------------
+# Visualization
+# -----------------------------
+
+plt.figure()
+plt.plot(m_adsorbent, removal_L, label="Langmuir Model")
+plt.plot(m_adsorbent, removal_F, label="Freundlich Model")
+plt.xlabel("Adsorbent Mass (kg)")
+plt.ylabel("Contaminant Removal (%)")
+plt.title("Removal Efficiency vs Adsorbent Mass")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure()
+plt.plot(m_adsorbent, profit_L, label="Langmuir Profit")
+plt.plot(m_adsorbent, profit_F, label="Freundlich Profit")
+plt.xlabel("Adsorbent Mass (kg)")
+plt.ylabel("Net Profit ($)")
+plt.title("Economic Optimization of Adsorption Process")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# -----------------------------
+# Optimal Conditions
+# -----------------------------
+
+opt_L = np.argmax(profit_L)
+opt_F = np.argmax(profit_F)
+
+print("Langmuir Optimal Adsorbent Mass (kg):", m_adsorbent[opt_L])
+print("Langmuir Maximum Profit ($):", profit_L[opt_L])
+
+print("Freundlich Optimal Adsorbent Mass (kg):", m_adsorbent[opt_F])
+print("Freundlich Maximum Profit ($):", profit_F[opt_F])
